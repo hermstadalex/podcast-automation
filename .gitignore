@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+dist/
+
+# Security (NEVER PUSH THESE)
+.env
+.env.*
+service_account.json
+test.js
+*.key
+
+# Local Pipeline State & Runtime Cache
+.state-*.json
+/tmp/
+*.log
+
+# macOS
+.DS_Store
