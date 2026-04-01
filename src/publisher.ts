@@ -56,6 +56,7 @@ export async function runPublisher() {
                 }
 
                 const captivatePayload = {
+                    clientName: '',
                     title: title,
                     summary: showNotesStr,
                     timestamps: [],
