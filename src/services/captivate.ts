@@ -65,7 +65,7 @@ export class CaptivateService {
         formData.append('media_id', mediaId);
         formData.append('title', showNotes.title);
         // The publisher passes the entire giant formatted text blob inside showNotes.summary
-        formData.append('shownotes', showNotes.summary);
+        formData.append('shownotes', showNotes.summary.substring(0, 3999));
         formData.append('summary', showNotes.summary.substring(0, 3000));
         formData.append('status', 'Draft');
 
