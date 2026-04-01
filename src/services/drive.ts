@@ -7,14 +7,22 @@ export class DriveService {
     private drive: any;
 
     constructor() {
-        const keyFilePath = path.join(__dirname, '../../service_account.json');
-        
+        const tokenPath = path.join(__dirname, '../../.google_tokens.json');
+
         try {
-            const auth = new google.auth.GoogleAuth({
-                keyFile: keyFilePath,
-                scopes: ['https://www.googleapis.com/auth/drive'],
-            });
-            this.drive = google.drive({ version: 'v3', auth });
+            const clientId = process.env.GOOGLE_CLIENT_ID;
+            const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+            if (!fs.existsSync(tokenPath)) {
+                logger.error('CRITICAL: Missing .google_tokens.json! You must run: npx ts-node src/tools/auth_google.ts first.');
+                process.exit(1);
+            }
+
+            const oAuth2Client = new google.auth.OAuth2(clientId, clientSecret, 'urn:ietf:wg:oauth:2.0:oob');
+            const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
+            oAuth2Client.setCredentials(tokenData);
+
+            this.drive = google.drive({ version: 'v3', auth: oAuth2Client as any });
         } catch (e: any) {
             logger.error(`Could not initialize Drive API. Ensure service_account.json is present.`);
         }
