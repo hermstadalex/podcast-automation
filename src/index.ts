@@ -10,6 +10,7 @@ import { CaptivateService } from './services/captivate';
 import { VideoService } from './services/video';
 import { YouTubeService } from './services/youtube';
 import { SheetsService } from './services/sheets';
+import { DriveService } from './services/drive';
 import fs from 'fs';
 
 config();
@@ -72,7 +73,38 @@ export async function runPipeline(inputPath: string, manualId?: string) {
         logger.info(`Skipping Auphonic. Found existing video: ${state.videoLoc}`);
     }
 
-    // 4. Log to Google Sheets (Human-In-The-Loop)
+    // STEP 4: Cloud CMS Reverse-Hosting (Upload Assets to Drive)
+    let squareArtDriveUrl = state.imageLoc;
+    let landscapeThumbDriveUrl = state.youtubeThumbLoc;
+    let audioDriveUrl = state.cleanedAudioLoc;
+    let videoDriveUrl = state.videoLoc;
+
+    const driveService = new DriveService();
+    const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+
+    if (driveFolderId) {
+        logger.info('Commencing Cloud CMS Upload Phase...');
+        try {
+            if (state.imageLoc && !state.imageLoc.startsWith('http')) {
+                squareArtDriveUrl = await withRetry(() => driveService.uploadFile(state.imageLoc!, 'image/jpeg', driveFolderId), 'Drive Upload Square Art');
+            }
+            if (state.youtubeThumbLoc && !state.youtubeThumbLoc.startsWith('http')) {
+                landscapeThumbDriveUrl = await withRetry(() => driveService.uploadFile(state.youtubeThumbLoc!, 'image/jpeg', driveFolderId), 'Drive Upload Landscape Thumb');
+            }
+            if (state.cleanedAudioLoc && !state.cleanedAudioLoc.startsWith('http')) {
+                audioDriveUrl = await withRetry(() => driveService.uploadFile(state.cleanedAudioLoc!, 'audio/mpeg', driveFolderId), 'Drive Upload Audio');
+            }
+            if (state.videoLoc && !state.videoLoc.startsWith('http')) {
+                videoDriveUrl = await withRetry(() => driveService.uploadFile(state.videoLoc!, 'video/mp4', driveFolderId), 'Drive Upload Video');
+            }
+            // State URLs are safely rewritten as standard HTTP links inside the Payload logic
+            logger.info('All assets successfully backed up to Google Drive Cloud CMS.');
+        } catch (e: any) {
+             logger.error(`Failed to upload to Google Drive CMS, falling back to local paths for Spreadsheet Log: ${e.message}`);
+        }
+    }
+
+    // STEP 5: Log to Google Sheets (Human-In-The-Loop)
     if (!state.sheetLogged) {
         const sheetsService = new SheetsService();
         const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
@@ -84,12 +116,12 @@ export async function runPipeline(inputPath: string, manualId?: string) {
             combinedShowNotes,                     // B: show notes
             state.showNotes.hashtags,              // C: hashtags
             state.showNotes.keywords,              // D: keywords
-            state.imageLoc || 'N/A',               // E: episode_art
-            state.videoLoc || state.cleanedAudioLoc || 'N/A', // F: dropbox_url
+            squareArtDriveUrl || 'N/A',            // E: episode_art (Now a Drive Link!)
+            videoDriveUrl || audioDriveUrl || 'N/A', // F: dropbox_url (Now a Drive Link!)
             "no",                                  // G: approved?
             "no",                                  // H: posted?
             todayStr,                              // I: publish_date
-            state.youtubeThumbLoc || 'N/A'         // J: youtube_thumbnail
+            landscapeThumbDriveUrl || 'N/A'        // J: youtube_thumbnail (Now a Drive Link!)
         ];
 
         await sheetsService.appendRow(tabName, rowPayload);

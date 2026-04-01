@@ -12,7 +12,7 @@ export class DriveService {
         try {
             const auth = new google.auth.GoogleAuth({
                 keyFile: keyFilePath,
-                scopes: ['https://www.googleapis.com/auth/drive.readonly'],
+                scopes: ['https://www.googleapis.com/auth/drive'],
             });
             this.drive = google.drive({ version: 'v3', auth });
         } catch (e: any) {
@@ -73,5 +73,54 @@ export class DriveService {
                 reject(error);
             }
         });
+    }
+
+    /**
+     * Uploads a localized asset back to Google Drive and forces it to be universally shareable
+     * @param localPath The local /tmp/ file path
+     * @param mimeType The file mime type (e.g., 'image/jpeg')
+     * @param parentFolderId The target Google Drive folder 
+     * @returns The public viewable HTTP url
+     */
+    async uploadFile(localPath: string, mimeType: string, parentFolderId: string): Promise<string> {
+         logger.info(`Uploading finished asset ${path.basename(localPath)} back into Cloud...`);
+         
+         if (!fs.existsSync(localPath)) throw new Error(`Asset not found locally: ${localPath}`);
+
+         const fileMetadata = {
+             name: path.basename(localPath),
+             parents: [parentFolderId]
+         };
+
+         const media = {
+             mimeType,
+             body: fs.createReadStream(localPath)
+         };
+
+         try {
+             const fileRes = await this.drive.files.create({
+                 requestBody: fileMetadata,
+                 media: media,
+                 fields: 'id, webViewLink, webContentLink',
+             });
+
+             const fileId = fileRes.data.id;
+
+             // Force universal sharing so human editors or Zernio can read the links
+             await this.drive.permissions.create({
+                 fileId: fileId,
+                 requestBody: { role: 'reader', type: 'anyone' }
+             });
+
+             // webContentLink initiates direct download, webViewLink is just the viewer page.
+             // webContentLink is far safer for Publisher / external daemons to easily parse.
+             const publicUrl = fileRes.data.webContentLink || fileRes.data.webViewLink;
+             logger.info(`Asset uploaded successfully! Public Link: ${publicUrl}`);
+             return publicUrl;
+             
+         } catch (error: any) {
+             logger.error(`Failed to upload ${localPath} to Drive: ${error.message}`);
+             throw error;
+         }
     }
 }
