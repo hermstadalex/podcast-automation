@@ -76,6 +76,47 @@ export class DriveService {
     }
 
     /**
+     * Finds a folder by name inside a parent, or creates it if it doesn't exist.
+     * Required for dynamic "Finished Assets -> Client Name -> Episode Name" nesting.
+     * @param parentFolderId The root Google Drive directory ID to begin nesting in
+     * @param folderName The target name of the folder
+     */
+    async getOrCreateFolder(parentFolderId: string, folderName: string): Promise<string> {
+        try {
+            // First, cleanly check if this literal folder name already exists exactly inside that parent
+            const sanitizedName = folderName.replace(/'/g, "\\'");
+            const res = await this.drive.files.list({
+                q: `mimeType='application/vnd.google-apps.folder' and name='${sanitizedName}' and '${parentFolderId}' in parents and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive',
+            });
+
+            if (res.data.files && res.data.files.length > 0) {
+                // Folder organically exists!
+                return res.data.files[0].id!;
+            }
+
+            logger.info(`Creating brand new structural folder '${folderName}' natively inside Drive parent ${parentFolderId}...`);
+            const fileMetadata = {
+                name: folderName,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [parentFolderId]
+            };
+
+            const createdFolder = await this.drive.files.create({
+                requestBody: fileMetadata,
+                fields: 'id',
+            });
+
+            return createdFolder.data.id!;
+
+        } catch (error: any) {
+            logger.error(`Failed to natively traverse or instantiate Drive folder '${folderName}': ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
      * Uploads a localized asset back to Google Drive and forces it to be universally shareable
      * @param localPath The local /tmp/ file path
      * @param mimeType The file mime type (e.g., 'image/jpeg')

@@ -80,27 +80,33 @@ export async function runPipeline(inputPath: string, manualId?: string) {
     let videoDriveUrl = state.videoLoc;
 
     const driveService = new DriveService();
-    const driveFolderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
+    const outputVaultRootId = process.env.GOOGLE_DRIVE_OUTPUT_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_ID;
 
-    if (driveFolderId) {
+    if (outputVaultRootId) {
         logger.info('Commencing Cloud CMS Upload Phase...');
         try {
+            // Natively traverse the Google Drive directory tree down to the specific Episode Hub
+            const safeClientName = (state.showNotes.clientName || 'Unknown Client').replace(/[/\\?%*:|"<>]/g, '-');
+            const clientFolderId = await withRetry(() => driveService.getOrCreateFolder(outputVaultRootId, safeClientName), 'Create Client Folder');
+            
+            const safeTitle = (state.showNotes.title || 'Untitled Episode').replace(/[/\\?%*:|"<>]/g, '-').substring(0, 60);
+            const episodeFolderId = await withRetry(() => driveService.getOrCreateFolder(clientFolderId, safeTitle), 'Create Episode Folder');
+
             if (state.imageLoc && !state.imageLoc.startsWith('http')) {
-                squareArtDriveUrl = await withRetry(() => driveService.uploadFile(state.imageLoc!, 'image/jpeg', driveFolderId), 'Drive Upload Square Art');
+                squareArtDriveUrl = await withRetry(() => driveService.uploadFile(state.imageLoc!, 'image/jpeg', episodeFolderId), 'Drive Upload Square Art');
             }
             if (state.youtubeThumbLoc && !state.youtubeThumbLoc.startsWith('http')) {
-                landscapeThumbDriveUrl = await withRetry(() => driveService.uploadFile(state.youtubeThumbLoc!, 'image/jpeg', driveFolderId), 'Drive Upload Landscape Thumb');
+                landscapeThumbDriveUrl = await withRetry(() => driveService.uploadFile(state.youtubeThumbLoc!, 'image/jpeg', episodeFolderId), 'Drive Upload Landscape Thumb');
             }
             if (state.cleanedAudioLoc && !state.cleanedAudioLoc.startsWith('http')) {
-                audioDriveUrl = await withRetry(() => driveService.uploadFile(state.cleanedAudioLoc!, 'audio/mpeg', driveFolderId), 'Drive Upload Audio');
+                audioDriveUrl = await withRetry(() => driveService.uploadFile(state.cleanedAudioLoc!, 'audio/mpeg', episodeFolderId), 'Drive Upload Audio');
             }
             if (state.videoLoc && !state.videoLoc.startsWith('http')) {
-                videoDriveUrl = await withRetry(() => driveService.uploadFile(state.videoLoc!, 'video/mp4', driveFolderId), 'Drive Upload Video');
+                videoDriveUrl = await withRetry(() => driveService.uploadFile(state.videoLoc!, 'video/mp4', episodeFolderId), 'Drive Upload Video');
             }
-            // State URLs are safely rewritten as standard HTTP links inside the Payload logic
-            logger.info('All assets successfully backed up to Google Drive Cloud CMS.');
+            logger.info(`All assets beautifully nested inside the Cloud CMS Vault at: /${safeClientName}/${safeTitle}/`);
         } catch (e: any) {
-             logger.error(`Failed to upload to Google Drive CMS, falling back to local paths for Spreadsheet Log: ${e.message}`);
+             logger.error(`Failed to execute Drive upload traversal, falling back to local paths for Spreadsheet Log: ${e.message}`);
         }
     }
 
