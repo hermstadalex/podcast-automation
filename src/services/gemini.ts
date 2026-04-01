@@ -64,7 +64,7 @@ export class GeminiService {
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
         const result = await model.generateContent([
             "Analyze this podcast media. You are an expert podcast producer and YouTube strategist. Generate the following strict JSON structure:\n" +
-            "1. clientName: Extract the core Brand name, Show name, or Client name from the host's intro organically (Max 3 words, e.g., 'Joe Rogan' or 'Acquired Podcast').\n" +
+            "1. clientName: Extract the core Brand name, Show name, or Client name from the host's intro organically and output it strictly as a 3-letter abbreviation (e.g., if analyzing 'The Podcast Report', return 'PRP').\n" +
             "2. title: A catchy, viral-worthy, SEO-optimized title for YouTube.\n" +
             "3. summary: A compelling 2-3 paragraph podcast show notes summary.\n" +
             "4. timestamps: An array of 5-7 key timestamps in 'MM:SS - Description' format.\n" +
