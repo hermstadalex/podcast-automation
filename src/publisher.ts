@@ -89,8 +89,17 @@ export async function runPublisher() {
 }
 
 if (require.main === module) {
+    logger.info('Publisher Daemon Initialized. Polling Google Sheets every 60 seconds for approvals...');
+    
+    // Run immediately once
     runPublisher().catch(e => {
-        logger.error(`Fatal error in publisher: ${e.message}`);
-        process.exit(1);
+        logger.error(`Initial publisher run failed: ${e.message}`);
     });
+
+    // Then loop forever 
+    setInterval(() => {
+        runPublisher().catch(e => {
+            logger.error(`Publisher poll failed: ${e.message}`);
+        });
+    }, 60 * 1000); // Poll every minute
 }
