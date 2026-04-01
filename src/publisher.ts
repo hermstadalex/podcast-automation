@@ -37,14 +37,8 @@ export async function runPublisher() {
             logger.info(`Found approved, unposted episode: "${title}"`);
             
             try {
-                // Ensure we have local files (handle dropbox custom overriding)
+                // We don't download the Artwork because Captivate expects a 255-character string URL!
                 let localArtUrl = artPath;
-                if (artPath?.startsWith('http')) {
-                    logger.info('Downloading overriding custom cover art from URL...');
-                    localArtUrl = `/tmp/custom_${Date.now()}.jpg`;
-                    const res = await axios.get(artPath, { responseType: 'arraybuffer' });
-                    fs.writeFileSync(localArtUrl, res.data);
-                }
 
                 let localAudioUrl = mediaPath;
                 if (mediaPath?.startsWith('http')) {

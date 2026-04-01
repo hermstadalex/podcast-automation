@@ -69,13 +69,11 @@ export class CaptivateService {
             status: 'Draft'
         };
 
-        if (fs.existsSync(imagePath)) {
-            logger.info(`Attaching Episode Artwork as Base64 encoded schema...`);
-            const b64 = fs.readFileSync(imagePath).toString('base64');
-            const mimeType = imagePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
-            payload.episode_art = `data:${mimeType};base64,${b64}`;
+        if (imagePath && imagePath.startsWith('http')) {
+            logger.info(`Attaching Episode Artwork as native HTTP URL...`);
+            payload.episode_art = imagePath;
         } else {
-            logger.warn(`Artwork not found at ${imagePath}, uploading episode without custom cover art.`);
+            logger.warn(`Valid HTTP Artwork not found, uploading episode without custom cover art.`);
         }
 
         try {
