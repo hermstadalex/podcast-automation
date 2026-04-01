@@ -60,25 +60,25 @@ export class CaptivateService {
         }
 
         logger.info('Sending episode JSON to Captivate...');
-        const payload: any = {
-            shows_id: this.showId,
-            media_id: mediaId,
-            title: showNotes.title,
-            summary: showNotes.summary,
-            shownotes: showNotes.timestamps.join('\n'),
-            status: 'Draft'
-        };
+        const formData = new FormData();
+        formData.append('shows_id', this.showId);
+        formData.append('media_id', mediaId);
+        formData.append('title', showNotes.title);
+        formData.append('summary', showNotes.summary);
+        formData.append('shownotes', showNotes.timestamps.join('\n'));
+        formData.append('status', 'Draft');
 
         if (imagePath && imagePath.startsWith('http')) {
             logger.info(`Attaching Episode Artwork as native HTTP URL...`);
-            payload.episode_art = imagePath;
+            formData.append('episode_art', imagePath);
         } else {
             logger.warn(`Valid HTTP Artwork not found, uploading episode without custom cover art.`);
         }
 
         try {
-            await axios.post(`https://api.captivate.fm/episodes`, payload, {
+            await axios.post(`https://api.captivate.fm/episodes`, formData, {
                 headers: {
+                    ...formData.getHeaders(),
                     'Authorization': `Bearer ${bearerToken}`
                 }
             });
