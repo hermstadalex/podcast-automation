@@ -115,7 +115,17 @@ export async function runPipeline(inputPath: string, manualId?: string) {
         const sheetsService = new SheetsService();
         const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
         const todayStr = new Date().toLocaleDateString('en-US');
-        const combinedShowNotes = `${state.showNotes.summary}\n\nTimestamps:\n${state.showNotes.timestamps.join('\n')}`;
+        const formattedTimestamps = state.showNotes.timestamps.map((t: any) => {
+            if (typeof t === 'string') return t;
+            if (typeof t === 'object' && t !== null) {
+                const time = t.time || t.timestamp || t.start || '';
+                const desc = t.description || t.topic || t.title || t.text || '';
+                return `${time} - ${desc}`.trim();
+            }
+            return String(t);
+        });
+
+        const combinedShowNotes = `${state.showNotes.summary}\n\nTimestamps:\n${formattedTimestamps.join('\n')}`;
 
         const rowPayload = [
             state.showNotes.title,                 // A: title

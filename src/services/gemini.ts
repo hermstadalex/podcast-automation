@@ -84,6 +84,20 @@ export class GeminiService {
         const responseText = result.response.text().trim();
         const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '');
         
-        return JSON.parse(cleanJson) as ShowNotes;
+        const parsed = JSON.parse(cleanJson) as ShowNotes;
+        
+        if (Array.isArray(parsed.timestamps)) {
+            parsed.timestamps = parsed.timestamps.map((t: any) => {
+                if (typeof t === 'string') return t;
+                if (typeof t === 'object' && t !== null) {
+                    const time = t.time || t.timestamp || t.start || '';
+                    const desc = t.description || t.topic || t.title || t.text || '';
+                    return `${time} - ${desc}`.trim();
+                }
+                return String(t);
+            });
+        }
+        
+        return parsed;
     }
 }
