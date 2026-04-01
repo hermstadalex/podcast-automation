@@ -64,8 +64,9 @@ export class CaptivateService {
         formData.append('shows_id', this.showId);
         formData.append('media_id', mediaId);
         formData.append('title', showNotes.title);
-        formData.append('summary', showNotes.summary);
-        formData.append('shownotes', showNotes.timestamps.join('\n'));
+        // The publisher passes the entire giant formatted text blob inside showNotes.summary
+        formData.append('shownotes', showNotes.summary);
+        formData.append('summary', showNotes.summary.substring(0, 3000));
         formData.append('status', 'Draft');
 
         if (imagePath && imagePath.startsWith('http')) {
