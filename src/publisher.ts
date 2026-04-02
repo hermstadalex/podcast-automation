@@ -12,13 +12,14 @@ config();
 export async function runPublisher() {
     logger.info('Starting Phase 2: Publisher Poll...');
     const sheetsService = new SheetsService();
+    const clientSheetsService = new SheetsService(process.env.GOOGLE_SHEETS_CLIENTS_ID);
     const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
 
     let clientRows: any[][] = [];
     let rows: any[][] = [];
     try {
         rows = await sheetsService.getRows(tabName);
-        clientRows = await sheetsService.getRows('Clients').catch(() => []); // Graceful fallback
+        clientRows = await clientSheetsService.getRows('Clients').catch(() => []); // Graceful fallback
     } catch (e: any) {
         logger.error(`Failed to read from Google Sheets: ${e.message}`);
         process.exit(1);

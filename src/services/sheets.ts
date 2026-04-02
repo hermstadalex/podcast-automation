@@ -7,8 +7,8 @@ export class SheetsService {
     private sheets: any;
     private spreadsheetId: string;
 
-    constructor() {
-        this.spreadsheetId = process.env.GOOGLE_SHEETS_ID || '';
+    constructor(overrideSpreadsheetId?: string) {
+        this.spreadsheetId = overrideSpreadsheetId || process.env.GOOGLE_SHEETS_ID || '';
         
         // Search for the JSON key that was verified in the tracker project
         // Or expect it directly in the root of podcast-automation
