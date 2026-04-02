@@ -11,106 +11,99 @@ config();
 
 export async function runPublisher() {
     logger.info('Starting Phase 2: Publisher Poll...');
-    const sheetsService = new SheetsService();
     const clientSheetsService = new SheetsService(process.env.GOOGLE_SHEETS_CLIENTS_ID);
     const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
 
     let clientRows: any[][] = [];
-    let rows: any[][] = [];
     try {
-        rows = await sheetsService.getRows(tabName);
-        clientRows = await clientSheetsService.getRows('Clients').catch(() => []); // Graceful fallback
+        clientRows = await clientSheetsService.getRows('Clients').catch(() => []);
     } catch (e: any) {
-        logger.error(`Failed to read from Google Sheets: ${e.message}`);
-        process.exit(1);
+        logger.error(`Failed to read Global Router Database: ${e.message}`);
+        return; // Don't crash daemon
     }
 
-    // Build the Multi-Tenant Master Dictionary
-    const clientDict: Record<string, { captivateId: string, zernioId: string }> = {};
-    for (let i = 1; i < clientRows.length; i++) {
-        const r = clientRows[i];
-        if (r && r[0]) {
-             clientDict[r[0].toString().toUpperCase().trim()] = { 
-                 captivateId: r[1], 
-                 zernioId: r[2] 
-             };
+    // Outer loop: Iterate sequentially across the entire array of completely quarantined Client Domains
+    for (let c = 1; c < clientRows.length; c++) {
+        const r = clientRows[c];
+        if (!r || !r[0] || !r[1] || r[0] === '') continue; // Skip broken rows or empty slots
+
+        const clientCode = r[0].toString().toUpperCase().trim();
+        const approvalSheetId = r[1];
+        const clientConfig = { captivateId: r[2] || '', zernioId: r[3] || '' };
+
+        logger.info(`Polling completely isolated Approval Spreadsheet for Client: [${clientCode}]...`);
+        const targetSheetService = new SheetsService(approvalSheetId);
+        let rows: any[][] = [];
+        try {
+            rows = await targetSheetService.getRows(tabName);
+        } catch (e: any) {
+            logger.warn(`Could not read ${tabName} tab in Spreadsheet ${approvalSheetId} for ${clientCode}. Proceeding to next client...`);
+            continue;
         }
-    }
 
-    // Skip header row
-    for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        
-        // Columns: title(0), notes(1), hash(2), keys(3), art(4), url(5), approved?(6), posted?(7), date(8), thumb(9), clientCode(10)
-        const title = row[0];
-        const showNotesStr = row[1];
-        const artPath = row[4];
-        const mediaPath = row[5];
-        const approved = row[6]?.toString().toUpperCase().trim();
-        const posted = row[7]?.toString().toUpperCase().trim();
-        const clientCode = row[10]?.toString().toUpperCase().trim() || 'PRP';
-
-        if (approved === 'YES' && posted === 'NO') {
-            logger.info(`Found approved, unposted episode: "${title}" mapped to Target Client [${clientCode}]`);
+        // Inner logic exactly identical, but hitting local variables strictly mapping to targetSheetService
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
             
-            const clientConfig = clientDict[clientCode] || { captivateId: '', zernioId: '' };
+            // Columns: title(0), notes(1), hash(2), keys(3), art(4), url(5), approved?(6), posted?(7), date(8), thumb(9), clientCode(10)
+            const title = row[0];
+            const showNotesStr = row[1];
+            const artPath = row[4];
+            const mediaPath = row[5];
+            const approved = row[6]?.toString().toUpperCase().trim();
+            const posted = row[7]?.toString().toUpperCase().trim();
 
-            try {
-                // We don't download the Artwork because Captivate expects a 255-character string URL!
-                let localArtUrl = artPath;
-
-                let localAudioUrl = mediaPath;
-                if (mediaPath?.startsWith('http')) {
-                    // It's possible the user overrode the audio link as well
-                    logger.info('Downloading overriding custom audio from URL...');
-                    localAudioUrl = `/tmp/custom_${Date.now()}.mp3`;
-                    const res = await axios.get(mediaPath, { responseType: 'arraybuffer' });
-                    fs.writeFileSync(localAudioUrl, res.data);
-                }
-
-                const captivatePayload = {
-                    clientName: clientCode,
-                    title: title,
-                    summary: showNotesStr,
-                    timestamps: [],
-                    hashtags: '',
-                    keywords: '',
-                    squareArtPrompt: '',
-                    landscapeThumbPrompt: ''
-                };
-
-                const captivate = new CaptivateService(clientConfig.captivateId);
-                logger.info(`Publishing to Captivate dynamically for ${clientCode}...`);
-                await captivate.publishEpisode(localAudioUrl, captivatePayload, localArtUrl);
-                logger.info('Captivate successful!');
+            if (approved === 'YES' && posted === 'NO') {
+                logger.info(`Found approved, unposted episode: "${title}" natively within isolated domain [${clientCode}]`);
                 
-                // --- NEW YOUTUBE ZERNIO PIPELINE ---
-                if (mediaPath) {
-                    const youtubeThumbUrl = row[9];
-                    if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
-                        logger.info('Proceeding to Zernio YouTube publisher phase...');
-                        const zernio = new ZernioService(clientConfig.zernioId);
-                        const keywordsStr = row[3] || '';
-                        await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr, keywordsStr);
-                    } else {
-                        logger.warn('No Landscape Thumbnail URL found in Spreadsheet. Bypassing YouTube publish logic.');
+                try {
+                    let localArtUrl = artPath;
+                    let localAudioUrl = mediaPath;
+                    if (mediaPath?.startsWith('http')) {
+                        logger.info('Downloading overriding custom audio from URL...');
+                        localAudioUrl = `/tmp/custom_${Date.now()}.mp3`;
+                        const res = await axios.get(mediaPath, { responseType: 'arraybuffer' });
+                        fs.writeFileSync(localAudioUrl, res.data);
                     }
-                } else {
-                    logger.warn('No media URL found. Bypassing YouTube logic entirely.');
+
+                    const captivatePayload = {
+                        clientName: clientCode,
+                        title: title,
+                        summary: showNotesStr,
+                        timestamps: [],
+                        hashtags: '',
+                        keywords: '',
+                        squareArtPrompt: '',
+                        landscapeThumbPrompt: ''
+                    };
+
+                    const captivate = new CaptivateService(clientConfig.captivateId);
+                    logger.info(`Publishing to Captivate dynamically for ${clientCode}...`);
+                    await captivate.publishEpisode(localAudioUrl, captivatePayload, localArtUrl);
+                    logger.info('Captivate successful!');
+                    
+                    if (mediaPath) {
+                        const youtubeThumbUrl = row[9];
+                        if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
+                            logger.info('Proceeding to Zernio YouTube publisher phase...');
+                            const zernio = new ZernioService(clientConfig.zernioId);
+                            const keywordsStr = row[3] || '';
+                            await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr, keywordsStr);
+                        } else {
+                            logger.warn('No Landscape Thumbnail URL found in Spreadsheet. Bypassing YouTube publish logic.');
+                        }
+                    } else {
+                        logger.warn('No media URL found. Bypassing YouTube logic entirely.');
+                    }
+                    
+                    logger.info(`Updating status to POSTED=yes entirely inside Private ${clientCode} Spreadsheet...`);
+                    const targetRowNumber = i + 1; 
+                    await targetSheetService.updateCell(tabName, targetRowNumber, 'H', 'yes');
+                    logger.info(`Episode successfully published and locally synchronized!`);
+
+                } catch (err: any) {
+                    logger.error(`Publisher failed for episode "${title}": ${err.message}`);
                 }
-                
-                logger.info('Updating Google Sheet status to POSTED=yes...');
-                
-                // Update column H (index 7, which is basically column H string representation)
-                // Row is i + 1 (1-based for Sheets API)
-                const targetRowNumber = i + 1; 
-                await sheetsService.updateCell(tabName, targetRowNumber, 'H', 'yes');
-
-                logger.info(`Episode successfully published and synced!`);
-
-            } catch (err: any) {
-                logger.error(`Publisher failed for episode "${title}": ${err.message}`);
-                // Don't kill the loop, move to next item
             }
         }
     }

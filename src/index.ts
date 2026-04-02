@@ -119,10 +119,33 @@ export async function runPipeline(inputPath: string, manualId?: string, clientCo
         }
     }
 
-    // STEP 5: Log to Google Sheets (Human-In-The-Loop)
+    // STEP 5: Log to Client's ISOLATED Google Sheets (Human-In-The-Loop)
     if (!state.sheetLogged) {
-        const sheetsService = new SheetsService();
+        let approvalSpreadsheetId: string | null = null;
+        if (state.showNotes.clientName) {
+            const routerService = new SheetsService(process.env.GOOGLE_SHEETS_CLIENTS_ID);
+            const clientsTab = await routerService.getRows('Clients').catch(() => []);
+            for (const r of clientsTab) {
+                if (r[0] && r[0].toString().toUpperCase().trim() === state.showNotes.clientName.toUpperCase().trim()) {
+                    approvalSpreadsheetId = r[1]; // Column B houses the isolated Spreadsheet ID!
+                    break;
+                }
+            }
+        }
+
+        if (!approvalSpreadsheetId) {
+             logger.warn(`Could not locate an Approval Spreadsheet URL mapped to Client [${state.showNotes.clientName}]. Falling back to Default .env!`);
+             approvalSpreadsheetId = process.env.GOOGLE_SHEETS_ID || null;
+        }
+
+        if (!approvalSpreadsheetId) {
+             logger.error('CRITICAL: No Approval Spreadsheet found and default is missing. Cannot proceed with appending output!');
+             process.exit(1);
+        }
+
+        const clientSheetService = new SheetsService(approvalSpreadsheetId);
         const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
+
         const todayStr = new Date().toLocaleDateString('en-US');
         const formattedTimestamps = state.showNotes.timestamps.map((t: any) => {
             if (typeof t === 'string') return t;
@@ -150,10 +173,10 @@ export async function runPipeline(inputPath: string, manualId?: string, clientCo
             state.showNotes.clientName || 'PRP'    // K: client_code
         ];
 
-        await sheetsService.appendRow(tabName, rowPayload);
+        await clientSheetService.appendRow(tabName, rowPayload);
         state.sheetLogged = true;
         saveState(pipelineId, state);
-        logger.info(`Phase 1 Generator Finished! Row appended to Google Sheet for HUMAN REVIEW.`);
+        logger.info(`Phase 1 Generator Finished! Row elegantly appended to Client [${state.showNotes.clientName}] explicitly for HUMAN REVIEW.`);
     } else {
         logger.info(`Skipping Sheets. Episode already logged for review.`);
     }
