@@ -10,7 +10,7 @@ export class ZernioService {
         this.accountId = process.env.ZERNIO_YOUTUBE_ACCOUNT_ID || '';
     }
 
-    async publishToYouTube(videoUrl: string, thumbnailUrl: string, title: string, description: string): Promise<void> {
+    async publishToYouTube(videoUrl: string, thumbnailUrl: string, title: string, description: string, keywordsStr: string = ''): Promise<void> {
         logger.info(`Publishing to YouTube via Zernio: ${title}`);
         
         if (!this.apiKey || !this.accountId) {
@@ -19,6 +19,9 @@ export class ZernioService {
         }
 
         try {
+             // Zernio supports explicit tags mapping inside the platformSpecific payload.
+             const tagsArray = keywordsStr ? keywordsStr.split(',').map(k => k.trim()).filter(Boolean) : [];
+
              const payload = {
                  content: description,
                  mediaItems: [
@@ -36,7 +39,8 @@ export class ZernioService {
                              title: title.substring(0, 100),
                              visibility: 'private',  // Default to private for safety and human review
                              categoryId: '27',       // Education
-                             madeForKids: false
+                             madeForKids: false,
+                             tags: tagsArray
                          }
                      }
                  ],

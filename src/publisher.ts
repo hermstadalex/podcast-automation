@@ -72,7 +72,8 @@ export async function runPublisher() {
                     if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
                         logger.info('Proceeding to Zernio YouTube publisher phase...');
                         const zernio = new ZernioService();
-                        await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr);
+                        const keywordsStr = row[3] || '';
+                        await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr, keywordsStr);
                     } else {
                         logger.warn('No Landscape Thumbnail URL found in Spreadsheet. Bypassing YouTube publish logic.');
                     }
