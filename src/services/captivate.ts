@@ -62,7 +62,7 @@ export class CaptivateService {
 
         logger.info('Sending episode JSON to Captivate...');
         
-        const htmlShowNotes = await marked.parse(showNotes.summary);
+        const htmlShowNotes = await marked.parse(showNotes.summary, { breaks: true, gfm: true });
         
         const formData = new FormData();
         formData.append('shows_id', this.showId);
