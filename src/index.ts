@@ -125,7 +125,7 @@ export async function runPipeline(inputPath: string, manualId?: string) {
             return String(t);
         });
 
-        const combinedShowNotes = `${state.showNotes.summary}\n\nTimestamps:\n${formattedTimestamps.join('\n')}`;
+        const combinedShowNotes = `${state.showNotes.summary}\n\n**Timestamps:**\n${formattedTimestamps.map((t: string) => `- ${t}`).join('\n')}`;
 
         const rowPayload = [
             state.showNotes.title,                 // A: title
