@@ -37,9 +37,12 @@ export async function runPipeline(inputPath: string, manualId?: string, clientCo
 
   try {
     // STEP 1: Gemini Text Extraction (on Raw Audio)
-    if (!state.showNotes) {
+    if (!state.showNotes || !state.showNotes.summary) {
         const geminiService = new GeminiService();
-        state.showNotes = await withRetry(() => geminiService.generateShowNotes(inputPath), 'Gemini Extraction');
+        const generatedNotes = await withRetry(() => geminiService.generateShowNotes(inputPath), 'Gemini Extraction');
+        
+        // Ensure we preserve the organically inherited ClientName that we injected natively before Gemini executed
+        state.showNotes = { ...generatedNotes, clientName: state.showNotes?.clientName };
         saveState(pipelineId, state);
         logger.info(`Gemini completed. Show notes title: ${state.showNotes.title}`);
     } else {
