@@ -1,6 +1,7 @@
 import axios from 'axios';
 import fs from 'fs';
 import FormData from 'form-data';
+import { marked } from 'marked';
 import { logger } from '../utils/logger';
 import { ShowNotes } from './gemini';
 
@@ -60,12 +61,15 @@ export class CaptivateService {
         }
 
         logger.info('Sending episode JSON to Captivate...');
+        
+        const htmlShowNotes = await marked.parse(showNotes.summary);
+        
         const formData = new FormData();
         formData.append('shows_id', this.showId);
         formData.append('media_id', mediaId);
         formData.append('title', showNotes.title);
-        // The publisher passes the entire giant formatted text blob inside showNotes.summary
-        formData.append('shownotes', showNotes.summary.substring(0, 3999));
+        // Transform the markdown blob exclusively into RSS-safe HTML structure to bypass dashboard text-stripping
+        formData.append('shownotes', htmlShowNotes.substring(0, 3999));
         formData.append('summary', showNotes.summary.substring(0, 3000));
         formData.append('status', 'Draft');
 
