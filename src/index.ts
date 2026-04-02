@@ -127,7 +127,7 @@ export async function runPipeline(inputPath: string, manualId?: string, clientCo
             const clientsTab = await routerService.getRows('Clients').catch(() => []);
             for (const r of clientsTab) {
                 if (r[0] && r[0].toString().toUpperCase().trim() === state.showNotes.clientName.toUpperCase().trim()) {
-                    approvalSpreadsheetId = r[1]; // Column B houses the isolated Spreadsheet ID!
+                    approvalSpreadsheetId = r[3]; // Column D houses the isolated Spreadsheet ID!
                     break;
                 }
             }

@@ -25,11 +25,11 @@ export async function runPublisher() {
     // Outer loop: Iterate sequentially across the entire array of completely quarantined Client Domains
     for (let c = 1; c < clientRows.length; c++) {
         const r = clientRows[c];
-        if (!r || !r[0] || !r[1] || r[0] === '') continue; // Skip broken rows or empty slots
+        if (!r || !r[0] || r[0] === '') continue; // Skip broken rows or empty slots
 
         const clientCode = r[0].toString().toUpperCase().trim();
-        const approvalSheetId = r[1];
-        const clientConfig = { captivateId: r[2] || '', zernioId: r[3] || '' };
+        const approvalSheetId = r[3]; // Column D
+        const clientConfig = { captivateId: r[1] || '', zernioId: r[2] || '' }; // Columns B and C
 
         logger.info(`Polling completely isolated Approval Spreadsheet for Client: [${clientCode}]...`);
         const targetSheetService = new SheetsService(approvalSheetId);
