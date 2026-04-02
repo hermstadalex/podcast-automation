@@ -5,9 +5,9 @@ export class ZernioService {
     private apiKey: string;
     private accountId: string;
 
-    constructor() {
+    constructor(overrideAccountId?: string) {
         this.apiKey = process.env.ZERNIO_API_KEY || '';
-        this.accountId = process.env.ZERNIO_YOUTUBE_ACCOUNT_ID || '';
+        this.accountId = overrideAccountId || process.env.ZERNIO_YOUTUBE_ACCOUNT_ID || '';
     }
 
     async publishToYouTube(videoUrl: string, thumbnailUrl: string, title: string, description: string, keywordsStr: string = ''): Promise<void> {

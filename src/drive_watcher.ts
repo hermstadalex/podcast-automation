@@ -19,41 +19,47 @@ async function processDriveInbox() {
     const driveService = new DriveService();
     
     try {
-        logger.info(`Scanning Google Drive Folder: ${driveFolderId} ...`);
-        const files = await driveService.scanFolder(driveFolderId);
+        logger.info(`Scanning Google Drive Parent Dropzone: ${driveFolderId} ...`);
+        const clientFolders = await driveService.listFolders(driveFolderId);
         
-        if (files.length === 0) {
-            logger.info('No media files found currently in drop-zone.');
+        if (clientFolders.length === 0) {
+            logger.info('No client subfolders discovered in drop-zone.');
             return;
         }
 
-        for (const file of files) {
-            const fileId = file.id!;
-            const fileName = file.name!;
-            const statePath = path.join(process.cwd(), `.state-${fileId}.json`);
+        for (const clientFolder of clientFolders) {
+            const clientCode = clientFolder.name?.trim().toUpperCase() || 'UNKNOWN';
+            const files = await driveService.scanFolder(clientFolder.id!);
+            
+            if (files.length > 0) logger.info(`Found ${files.length} unfinished files natively inside client [${clientCode}]`);
 
-            // Skip anything we already downloaded and processed
-            if (fs.existsSync(statePath)) {
-                logger.info(`Skipping ${fileName} (already processed)`);
-                continue;
-            }
+            for (const file of files) {
+                const fileId = file.id!;
+                const fileName = file.name!;
+                const statePath = path.join(process.cwd(), `.state-${fileId}.json`);
 
-            logger.info(`[NEW FILE DETECTED]: ${fileName} (ID: ${fileId})`);
-            const localDestPath = `/tmp/gdrive_${fileId}_${fileName.replace(/\s+/g, '_')}`;
+                // Skip anything we already downloaded and processed
+                if (fs.existsSync(statePath)) {
+                    continue; // Suppress spam for already processed items
+                }
 
-            try {
-                // Download the giant file
-                await driveService.downloadFile(fileId, localDestPath);
-                
-                // Fire off the generation Phase 1 pipeline explicitly!
-                logger.info(`Firing Phase 1 Generator on ${localDestPath}`);
-                await runPipeline(localDestPath, fileId);
+                logger.info(`[NEW FILE DETECTED]: ${fileName} for Client ${clientCode} (ID: ${fileId})`);
+                const localDestPath = `/tmp/gdrive_${fileId}_${fileName.replace(/\s+/g, '_')}`;
 
-                logger.info(`Successfully completed pipeline loop for ${fileName}`);
-                
-            } catch (e: any) {
-                logger.error(`Critical failure during download or execution of ${fileName}: ${e.message}`);
-                // Move to next file rather than completely dying
+                try {
+                    // Download the giant file
+                    await driveService.downloadFile(fileId, localDestPath);
+                    
+                    // Fire off the generation Phase 1 pipeline explicitly with the Client Code Context!
+                    logger.info(`Firing Phase 1 Generator on ${localDestPath}`);
+                    await runPipeline(localDestPath, fileId, clientCode);
+
+                    logger.info(`Successfully completed pipeline loop for ${fileName}`);
+                    
+                } catch (e: any) {
+                    logger.error(`Critical failure during download or execution of ${fileName}: ${e.message}`);
+                    // Move to next file rather than completely dying
+                }
             }
         }
 

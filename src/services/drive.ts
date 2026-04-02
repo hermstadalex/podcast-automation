@@ -29,6 +29,25 @@ export class DriveService {
     }
 
     /**
+     * Lists all pure directory subfolders natively nested within a parent Dropzone root
+     * @param parentFolderId The Google Drive ID from the URL of the root dropzone
+     */
+    async listFolders(parentFolderId: string) {
+        if (!parentFolderId) throw new Error('Missing Google Drive Parent Hierarchy ID');
+        
+        try {
+            const res = await this.drive.files.list({
+                q: `'${parentFolderId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
+                fields: 'files(id, name)',
+            });
+            return res.data.files || [];
+        } catch (error: any) {
+            logger.error(`Drive API Subfolder Scan Failed: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
      * Scans a specific folder for unarchived media files
      * @param folderId The Google Drive ID from the URL
      */

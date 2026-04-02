@@ -10,10 +10,10 @@ export class CaptivateService {
     private userId: string;
     private showId: string;
 
-    constructor() {
+    constructor(overrideShowId?: string) {
         this.apiToken = process.env.CAPTIVATE_API_TOKEN || '';
         this.userId = process.env.CAPTIVATE_USER_ID || '';
-        this.showId = process.env.CAPTIVATE_SHOW_ID || '';
+        this.showId = overrideShowId || process.env.CAPTIVATE_SHOW_ID || '';
     }
 
     async publishEpisode(audioPath: string, showNotes: ShowNotes, imagePath: string): Promise<void> {

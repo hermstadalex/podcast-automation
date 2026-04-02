@@ -15,7 +15,7 @@ import fs from 'fs';
 
 config();
 
-export async function runPipeline(inputPath: string, manualId?: string) {
+export async function runPipeline(inputPath: string, manualId?: string, clientCode?: string) {
   logger.info(`Starting Phase 1 pipeline for: ${inputPath}`);
 
   if (!fs.existsSync(inputPath)) {
@@ -25,6 +25,15 @@ export async function runPipeline(inputPath: string, manualId?: string) {
 
   const pipelineId = manualId || path.basename(inputPath, path.extname(inputPath)).replace(/[^a-z0-9]/gi, '_').toLowerCase();
   let state: PipelineState = loadState(pipelineId);
+  
+  if (clientCode) {
+      // Force Client Code override into state memory permanently so human edits aren't lost on resume constraints
+      if (!state.showNotes) {
+          state.showNotes = {} as any;
+      }
+      state.showNotes.clientName = clientCode;
+      saveState(pipelineId, state);
+  }
 
   try {
     // STEP 1: Gemini Text Extraction (on Raw Audio)
@@ -137,7 +146,8 @@ export async function runPipeline(inputPath: string, manualId?: string) {
             "no",                                  // G: approved?
             "no",                                  // H: posted?
             todayStr,                              // I: publish_date
-            landscapeThumbDriveUrl || 'N/A'        // J: youtube_thumbnail (Now a Drive Link!)
+            landscapeThumbDriveUrl || 'N/A',       // J: youtube_thumbnail (Now a Drive Link!)
+            state.showNotes.clientName || 'PRP'    // K: client_code
         ];
 
         await sheetsService.appendRow(tabName, rowPayload);

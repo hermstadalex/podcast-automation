@@ -14,29 +14,46 @@ export async function runPublisher() {
     const sheetsService = new SheetsService();
     const tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Podcasts';
 
+    let clientRows: any[][] = [];
     let rows: any[][] = [];
     try {
         rows = await sheetsService.getRows(tabName);
+        clientRows = await sheetsService.getRows('Clients').catch(() => []); // Graceful fallback
     } catch (e: any) {
         logger.error(`Failed to read from Google Sheets: ${e.message}`);
         process.exit(1);
+    }
+
+    // Build the Multi-Tenant Master Dictionary
+    const clientDict: Record<string, { captivateId: string, zernioId: string }> = {};
+    for (let i = 1; i < clientRows.length; i++) {
+        const r = clientRows[i];
+        if (r && r[0]) {
+             clientDict[r[0].toString().toUpperCase().trim()] = { 
+                 captivateId: r[1], 
+                 zernioId: r[2] 
+             };
+        }
     }
 
     // Skip header row
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         
-        // Columns: title(0), notes(1), hash(2), keys(3), art(4), url(5), approved?(6), posted?(7)
+        // Columns: title(0), notes(1), hash(2), keys(3), art(4), url(5), approved?(6), posted?(7), date(8), thumb(9), clientCode(10)
         const title = row[0];
         const showNotesStr = row[1];
         const artPath = row[4];
         const mediaPath = row[5];
         const approved = row[6]?.toString().toUpperCase().trim();
         const posted = row[7]?.toString().toUpperCase().trim();
+        const clientCode = row[10]?.toString().toUpperCase().trim() || 'PRP';
 
         if (approved === 'YES' && posted === 'NO') {
-            logger.info(`Found approved, unposted episode: "${title}"`);
+            logger.info(`Found approved, unposted episode: "${title}" mapped to Target Client [${clientCode}]`);
             
+            const clientConfig = clientDict[clientCode] || { captivateId: '', zernioId: '' };
+
             try {
                 // We don't download the Artwork because Captivate expects a 255-character string URL!
                 let localArtUrl = artPath;
@@ -51,7 +68,7 @@ export async function runPublisher() {
                 }
 
                 const captivatePayload = {
-                    clientName: '',
+                    clientName: clientCode,
                     title: title,
                     summary: showNotesStr,
                     timestamps: [],
@@ -61,8 +78,8 @@ export async function runPublisher() {
                     landscapeThumbPrompt: ''
                 };
 
-                const captivate = new CaptivateService();
-                logger.info('Publishing to Captivate...');
+                const captivate = new CaptivateService(clientConfig.captivateId);
+                logger.info(`Publishing to Captivate dynamically for ${clientCode}...`);
                 await captivate.publishEpisode(localAudioUrl, captivatePayload, localArtUrl);
                 logger.info('Captivate successful!');
                 
@@ -71,7 +88,7 @@ export async function runPublisher() {
                     const youtubeThumbUrl = row[9];
                     if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
                         logger.info('Proceeding to Zernio YouTube publisher phase...');
-                        const zernio = new ZernioService();
+                        const zernio = new ZernioService(clientConfig.zernioId);
                         const keywordsStr = row[3] || '';
                         await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr, keywordsStr);
                     } else {
