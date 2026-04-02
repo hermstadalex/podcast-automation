@@ -3,17 +3,17 @@ import { logger } from '../utils/logger';
 
 export class ZernioService {
     private apiKey: string;
-    private accountId: string;
+    private youtubeAccountId: string;
 
-    constructor(overrideAccountId?: string) {
+    constructor(overrideYoutubeAccountId?: string) {
         this.apiKey = process.env.ZERNIO_API_KEY || '';
-        this.accountId = overrideAccountId || process.env.ZERNIO_YOUTUBE_ACCOUNT_ID || '';
+        this.youtubeAccountId = overrideYoutubeAccountId || process.env.ZERNIO_YOUTUBE_ACCOUNT_ID || '';
     }
 
     async publishToYouTube(videoUrl: string, thumbnailUrl: string, title: string, description: string, keywordsStr: string = ''): Promise<void> {
         logger.info(`Publishing to YouTube via Zernio: ${title}`);
         
-        if (!this.apiKey || !this.accountId) {
+        if (!this.apiKey || !this.youtubeAccountId) {
              logger.warn('ZERNIO_API_KEY or ZERNIO_YOUTUBE_ACCOUNT_ID is completely missing. Safely bypassing YouTube upload.');
              return Promise.resolve();
         }
@@ -34,7 +34,7 @@ export class ZernioService {
                  platforms: [
                      {
                          platform: 'youtube',
-                         accountId: this.accountId,
+                         accountId: this.youtubeAccountId,
                          platformSpecificData: {
                              title: title.substring(0, 100),
                              visibility: 'private',  // Default to private for safety and human review

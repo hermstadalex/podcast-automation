@@ -29,7 +29,7 @@ export async function runPublisher() {
 
         const clientCode = r[0].toString().toUpperCase().trim();
         const approvalSheetId = r[3]; // Column D
-        const clientConfig = { captivateId: r[1] || '', zernioId: r[2] || '' }; // Columns B and C
+        const clientConfig = { captivateId: r[1] || '', zernioYouTubeId: r[2] || '' }; // Columns B and C
 
         logger.info(`Polling completely isolated Approval Spreadsheet for Client: [${clientCode}]...`);
         const targetSheetService = new SheetsService(approvalSheetId);
@@ -86,7 +86,7 @@ export async function runPublisher() {
                         const youtubeThumbUrl = row[9];
                         if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
                             logger.info('Proceeding to Zernio YouTube publisher phase...');
-                            const zernio = new ZernioService(clientConfig.zernioId);
+                            const zernio = new ZernioService(clientConfig.zernioYouTubeId);
                             const keywordsStr = row[3] || '';
                             await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr, keywordsStr);
                         } else {
