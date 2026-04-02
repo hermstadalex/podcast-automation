@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { SheetsService } from './services/sheets';
 import { CaptivateService } from './services/captivate';
+import { ZernioService } from './services/zernio';
 import { logger } from './utils/logger';
 import path from 'path';
 import axios from 'axios';
@@ -63,8 +64,23 @@ export async function runPublisher() {
                 const captivate = new CaptivateService();
                 logger.info('Publishing to Captivate...');
                 await captivate.publishEpisode(localAudioUrl, captivatePayload, localArtUrl);
+                logger.info('Captivate successful!');
                 
-                logger.info('Captivate successful! Updating Google Sheet status to POSTED=yes...');
+                // --- NEW YOUTUBE ZERNIO PIPELINE ---
+                if (mediaPath) {
+                    const youtubeThumbUrl = row[9];
+                    if (youtubeThumbUrl && youtubeThumbUrl !== 'N/A') {
+                        logger.info('Proceeding to Zernio YouTube publisher phase...');
+                        const zernio = new ZernioService();
+                        await zernio.publishToYouTube(mediaPath, youtubeThumbUrl, title, showNotesStr);
+                    } else {
+                        logger.warn('No Landscape Thumbnail URL found in Spreadsheet. Bypassing YouTube publish logic.');
+                    }
+                } else {
+                    logger.warn('No media URL found. Bypassing YouTube logic entirely.');
+                }
+                
+                logger.info('Updating Google Sheet status to POSTED=yes...');
                 
                 // Update column H (index 7, which is basically column H string representation)
                 // Row is i + 1 (1-based for Sheets API)
